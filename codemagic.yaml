@@ -1,0 +1,29 @@
+# Codemagic: builds the Splash AI Android app (.apk) from this repo.
+# In Codemagic, open this app and start the "Splash AI Android APK" workflow.
+workflows:
+  android-apk:
+    name: Splash AI Android APK
+    instance_type: linux_x2
+    max_build_duration: 30
+    environment:
+      node: 20
+      java: 17
+    scripts:
+      - name: Install packages
+        script: |
+          cd mobile
+          npm ci
+      - name: Create the Android project
+        script: |
+          cd mobile
+          npm run sync
+          npx cap add android
+          node scripts/patch-android.js
+          npx cap sync android
+      - name: Build the APK
+        script: |
+          cd mobile/android
+          chmod +x gradlew
+          ./gradlew assembleDebug
+    artifacts:
+      - mobile/android/app/build/outputs/apk/**/*.apk

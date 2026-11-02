@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Splash AI</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="top">
+    <div class="wordmark">Splash<span>AI</span></div>
+    <div id="linkBadge" class="badge">Laptop not linked</div>
+  </header>
+
+  <main>
+    <section class="view on" id="view-talk">
+      <div class="stage">
+        <canvas id="core" aria-label="Tap to talk"></canvas>
+        <p id="stateLabel" class="state">Tap the core to talk</p>
+        <p id="liveText" class="live"></p>
+      </div>
+      <div id="messages" class="messages"></div>
+      <form id="askForm" class="askbar" autocomplete="off">
+        <button type="button" id="handsFree" class="hf" aria-pressed="false" title="Hands-free: listen for the wake word">Wake</button>
+        <input id="askInput" placeholder="Type a command">
+        <button class="send">Send</button>
+      </form>
+    </section>
+
+    <section class="view" id="view-history">
+      <div class="head"><h2>Conversations</h2><button id="newConv" class="ghost">New conversation</button></div>
+      <ul id="historyList" class="list"></ul>
+    </section>
+
+    <section class="view" id="view-notes">
+      <h2>Notes from your talks</h2>
+      <div id="notesList"></div>
+    </section>
+
+    <section class="view" id="view-memory">
+      <h2>Lessons it learned</h2>
+      <ul id="lessonList" class="list"></ul>
+      <form class="inline" data-kind="lessons"><input placeholder="Teach it a rule"><button>Add</button></form>
+      <h2>Things it remembers about you</h2>
+      <ul id="factList" class="list"></ul>
+      <form class="inline" data-kind="facts"><input placeholder="Add a fact"><button>Add</button></form>
+    </section>
+
+    <section class="view" id="view-settings">
+      <h2>Your laptop</h2>
+      <p class="hint">On the laptop, open Splash AI, go to Settings, Phone link. A QR code and a 6-number PIN show there.</p>
+      <button id="scanQr" class="primary wide">Scan QR code</button>
+      <details id="pinPair" class="pinpair">
+        <summary>No camera? Pair with PIN</summary>
+        <input id="pinAddr" class="wide" placeholder="Laptop address, e.g. 192.168.1.20" inputmode="decimal">
+        <input id="pinCode" class="wide pininput" placeholder="6-number PIN" inputmode="numeric" maxlength="7" autocomplete="one-time-code">
+        <button id="pinGo" class="ghost">Pair</button>
+      </details>
+      <details class="pinpair">
+        <summary>Advanced: address and long code</summary>
+        <input id="lapAddr" class="wide" placeholder="Address, e.g. 192.168.1.20:7777" inputmode="url">
+        <input id="lapToken" class="wide" placeholder="Pairing code">
+      </details>
+      <div class="btnrow">
+        <button id="testLink" class="ghost">Test the link</button>
+        <button id="importKeys" class="ghost">Copy model keys from laptop</button>
+        <button id="syncNow" class="ghost">Sync now</button>
+      </div>
+
+      <h2>Wake words</h2>
+      <p class="hint">Used in hands-free mode while the app is open.</p>
+      <div id="wakeChips" class="chips"></div>
+      <form id="wakeForm" class="inline"><input placeholder="Add a wake word"><button>Add</button></form>
+
+      <h2>What it calls you</h2>
+      <input id="namesInput" class="wide">
+
+      <h2>Behaviour</h2>
+      <label class="toggle"><input type="checkbox" id="optSpeak"> Speak replies out loud</label>
+
+      <h2>Models</h2>
+      <p class="hint">Top to bottom is the order it tries them. Paste keys, or copy them from your laptop above.</p>
+      <div id="providerList"></div>
+
+      <div class="savebar"><button id="saveSettings" class="primary">Save settings</button></div>
+      <button id="wipeAll" class="ghost danger">Delete all history on this phone</button>
+    </section>
+  </main>
+
+  <nav class="bottomnav">
+    <button data-view="talk" class="on">Talk</button>
+    <button data-view="history">History</button>
+    <button data-view="notes">Notes</button>
+    <button data-view="memory">Memory</button>
+    <button data-view="settings">Settings</button>
+  </nav>
+
+  <div id="confirmBox" class="modal" hidden>
+    <div class="modalcard" role="dialog" aria-modal="true">
+      <h2>Your laptop asks: go ahead?</h2>
+      <pre id="confirmText"></pre>
+      <div class="row"><button id="confirmNo" class="ghost">Don't do it</button><button id="confirmYes" class="primary">Do it</button></div>
+    </div>
+  </div>
+  <div id="toast" class="toast" hidden></div>
+
+  <script src="shared/router.js"></script>
+  <script src="shared/brain.js"></script>
+  <script src="shared/visual.js"></script>
+  <script src="shared/core.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

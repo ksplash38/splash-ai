@@ -1,0 +1,48 @@
+{
+  "name": "splash-ai",
+  "productName": "Splash AI",
+  "version": "1.0.0",
+  "description": "Kelvin's personal AI assistant",
+  "author": "Kelvin Ibulu",
+  "main": "src/main.js",
+  "scripts": {
+    "sync": "node ../scripts/sync-shared.js",
+    "start": "npm run sync && electron .",
+    "dist": "npm run sync && electron-builder --win nsis portable"
+  },
+  "dependencies": {
+    "msedge-tts": "2.1.1",
+    "qrcode": "1.5.4",
+    "vosk-browser": "~0.0.5"
+  },
+  "devDependencies": {
+    "electron": "^33.2.0",
+    "electron-builder": "^25.1.8"
+  },
+  "build": {
+    "appId": "com.kelvin.splashai",
+    "productName": "Splash AI",
+    "directories": {
+      "output": "dist",
+      "buildResources": "build"
+    },
+    "files": [
+      "src/**/*",
+      "renderer/**/*",
+      "node_modules/**/*",
+      "package.json"
+    ],
+    "win": {
+      "icon": "build/icon.png"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "shortcutName": "Splash AI"
+    },
+    "portable": {
+      "artifactName": "SplashAI-Portable-${version}.exe"
+    }
+  }
+}

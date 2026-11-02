@@ -1,0 +1,143 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-eval' blob:; worker-src 'self' blob:; connect-src 'self' http://127.0.0.1:* blob: data:; style-src 'self' 'unsafe-inline'; img-src 'self' data:; media-src 'self' blob:">
+  <title>Splash AI</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="titlebar">
+    <div class="wordmark">Splash<span>AI</span></div>
+    <div id="modelBadge" class="badge" title="Model answering right now">Starting up</div>
+    <button id="panelToggle" class="paneltoggle" title="Hide the side panel (Ctrl+B)" aria-label="Hide the side panel" aria-controls="sidePanel" aria-expanded="true">
+      <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="1.6" d="M3.5 5.5h17v13h-17zM15 5.5v13"/><path id="panelToggleFill" fill="currentColor" d="M15 5.5h5.5v13H15z"/></svg>
+    </button>
+  </header>
+
+  <main class="shell">
+    <section class="stage">
+      <canvas id="core" aria-hidden="true"></canvas>
+      <div class="caption">
+        <p id="stateLabel" class="state">Getting the microphone ready</p>
+        <p id="liveText" class="live"></p>
+      </div>
+      <form id="askForm" class="askbar" autocomplete="off">
+        <button type="button" id="micBtn" class="mic" title="Talk now (Ctrl+Space)" aria-label="Talk now">
+          <svg viewBox="0 0 24 24" width="22" height="22"><path fill="currentColor" d="M12 15a3 3 0 0 0 3-3V6a3 3 0 1 0-6 0v6a3 3 0 0 0 3 3Zm5-3a5 5 0 0 1-10 0H5a7 7 0 0 0 6 6.92V21h2v-2.08A7 7 0 0 0 19 12h-2Z"/></svg>
+        </button>
+        <button type="button" id="listenBtn" class="listen" title="Stop listening to me" aria-label="Stop listening to me" aria-pressed="false">
+          <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path fill="currentColor" d="M12 15a3 3 0 0 0 3-3V6a3 3 0 1 0-6 0v6a3 3 0 0 0 3 3Zm5-3a5 5 0 0 1-10 0H5a7 7 0 0 0 6 6.92V21h2v-2.08A7 7 0 0 0 19 12h-2Z"/><path d="M4 4l16 16" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>
+          <span id="listenBtnText">Stop listening</span>
+        </button>
+        <input id="askInput" placeholder="Type a command, or say your wake word" aria-label="Command">
+        <button type="submit" class="send">Send</button>
+      </form>
+    </section>
+
+    <aside class="panel" id="sidePanel">
+      <div id="panelGrip" class="grip" title="Drag to make the panel wider or narrower. Double-click to reset." role="separator" aria-orientation="vertical" aria-label="Resize side panel"></div>
+      <nav class="tabs" role="tablist">
+        <button data-tab="chat" class="on">Chat</button>
+        <button data-tab="history">History</button>
+        <button data-tab="notes">Notes</button>
+        <button data-tab="memory">Memory</button>
+        <button data-tab="settings">Settings</button>
+      </nav>
+
+      <div class="tab on" id="tab-chat">
+        <div class="tabhead">
+          <h2 id="convTitle">New conversation</h2>
+          <button id="newConv" class="ghost">New conversation</button>
+        </div>
+        <div id="messages" class="messages"></div>
+      </div>
+
+      <div class="tab" id="tab-history">
+        <div class="tabhead">
+          <h2>Conversations</h2>
+          <button id="clearHistory" class="ghost danger">Delete all</button>
+        </div>
+        <ul id="historyList" class="list"></ul>
+      </div>
+
+      <div class="tab" id="tab-notes">
+        <div class="tabhead">
+          <h2>Notes from your talks</h2>
+          <button id="openFolder" class="ghost">Open folder</button>
+        </div>
+        <div id="notesList"></div>
+      </div>
+
+      <div class="tab" id="tab-memory">
+        <h2>Lessons it learned</h2>
+        <p class="hint">When you correct Splash AI, the lesson lands here and it follows it from then on.</p>
+        <ul id="lessonList" class="list"></ul>
+        <form class="inline" data-kind="lessons"><input placeholder="Teach it a rule, e.g. Always save notes to D:\Work"><button>Add</button></form>
+        <h2>Things it remembers about you</h2>
+        <ul id="factList" class="list"></ul>
+        <form class="inline" data-kind="facts"><input placeholder="Add a fact, e.g. My shop opens at 8am"><button>Add</button></form>
+      </div>
+
+      <div class="tab" id="tab-settings">
+        <h2>Wake words</h2>
+        <p class="hint">Say any of these to wake it. Watch "Heard" under the core to see how it hears you, then add that spelling too.</p>
+        <div id="wakeChips" class="chips"></div>
+        <form id="wakeForm" class="inline"><input placeholder="Add a wake word, e.g. yo splash"><button>Add</button></form>
+
+        <h2>What it calls you</h2>
+        <input id="namesInput" class="wide" placeholder="Kelvin, Ksplash">
+
+        <h2>Models</h2>
+        <p class="hint">Top to bottom is the order it tries them. When one runs out, the next takes over. Paste a free key to switch a model on.</p>
+        <div id="providerList"></div>
+
+        <h2>Behaviour</h2>
+        <label class="toggle"><input type="checkbox" id="optConfirm"> Ask me before deleting files, overwriting files or running commands</label>
+        <label class="toggle"><input type="checkbox" id="optSpeak"> Speak replies out loud</label>
+        <label class="toggle"><input type="checkbox" id="optWhisper"> Use Groq Whisper for sharper speech recognition (needs a Groq key)</label>
+        <label class="toggle"><input type="checkbox" id="optStartup"> Start with Windows, hidden in the tray</label>
+        <label class="field">Voice <select id="voiceSelect"></select></label>
+        <label class="field">Talk-now shortcut <input id="hotkeyInput" placeholder="Control+Space"></label>
+
+        <h2>Phone link</h2>
+        <p class="hint">On your phone, open Splash AI, go to Settings and tap <strong>Scan QR code</strong>, then point the camera at this. No camera? Tap <strong>Pair with PIN</strong> and type the address and the 6 numbers. Both must be on the same Wi-Fi (or Tailscale).</p>
+        <div class="pairbox">
+          <img id="pairQr" alt="QR code to link your phone" width="180" height="180">
+          <div class="pairtext">
+            <div class="pinlabel">PIN</div>
+            <div id="pairPin" class="pin" aria-live="polite">------</div>
+            <div id="pairAddr" class="pairaddr"></div>
+            <div id="pairExpires" class="hint"></div>
+            <button id="newPin" class="ghost">New PIN</button>
+          </div>
+        </div>
+        <details class="longcode"><summary>Show the long pairing code instead</summary><div id="phoneInfo" class="phoneinfo"></div></details>
+        <label class="toggle"><input type="checkbox" id="optRemote"> Allow my phone to control this computer</label>
+        <button id="regenToken" class="ghost">Make a new pairing code</button>
+
+        <div class="savebar"><button id="saveSettings" class="primary">Save settings</button></div>
+      </div>
+    </aside>
+  </main>
+
+  <div id="confirmBox" class="modal" hidden>
+    <div class="modalcard" role="dialog" aria-modal="true" aria-labelledby="confirmTitle">
+      <h2 id="confirmTitle">Go ahead with this?</h2>
+      <pre id="confirmText"></pre>
+      <div class="row">
+        <button id="confirmNo" class="ghost">Don't do it</button>
+        <button id="confirmYes" class="primary">Do it</button>
+      </div>
+    </div>
+  </div>
+  <div id="toast" class="toast" hidden></div>
+
+  <script src="../node_modules/vosk-browser/dist/vosk.js"></script>
+  <script src="shared/core.js"></script>
+  <script src="shared/brain.js"></script>
+  <script src="shared/visual.js"></script>
+  <script src="voice.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

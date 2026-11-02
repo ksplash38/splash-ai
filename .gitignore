@@ -1,0 +1,17 @@
+# installed packages and build output
+node_modules/
+desktop/dist/
+mobile/android/
+# local copy of the Electron download (too big for GitHub; npm fetches it anyway)
+desktop/electron.zip
+*.zip
+
+# copies of /shared made by scripts/sync-shared.js before every run or build
+desktop/src/shared/
+desktop/renderer/shared/
+mobile/www/shared/
+
+*.log
+.DS_Store
+Thumbs.db
+.github/
