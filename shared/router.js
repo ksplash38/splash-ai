@@ -16,8 +16,10 @@
     { id: 'mistral', name: 'Mistral', base: 'https://api.mistral.ai/v1', model: 'mistral-small-latest', keyUrl: 'https://console.mistral.ai/api-keys' },
     { id: 'github', name: 'GitHub Models', base: 'https://models.github.ai/inference', model: 'openai/gpt-4.1-mini', keyUrl: 'https://github.com/settings/tokens' },
     { id: 'huggingface', name: 'Hugging Face', base: 'https://router.huggingface.co/v1', model: 'meta-llama/Llama-3.3-70B-Instruct', keyUrl: 'https://huggingface.co/settings/tokens' },
+    // Z.ai's GLM. Thinks before answering by default, which is slow for voice, so that is switched off.
+    { id: 'glm', name: 'GLM 5.2 (Z.ai)', base: 'https://api.z.ai/api/paas/v4', model: 'glm-5.2', keyUrl: 'https://z.ai/manage-apikey/apikey-list', paid: true, extra: { thinking: { type: 'disabled' } } },
     // Paid (pay per use, needs credit on the account). Speaks Anthropic's own Messages API, not /chat/completions.
-    { id: 'claude', name: 'Claude (paid)', base: 'https://api.anthropic.com/v1', model: 'claude-opus-5-5', keyUrl: 'https://platform.claude.com/settings/keys', format: 'anthropic' },
+    { id: 'claude', name: 'Claude (paid)', base: 'https://api.anthropic.com/v1', model: 'claude-opus-5-5', keyUrl: 'https://platform.claude.com/settings/keys', format: 'anthropic', paid: true },
     { id: 'ollama', name: 'Ollama (on this computer, unlimited)', base: 'http://localhost:11434/v1', model: 'llama3.2', keyUrl: 'https://ollama.com/download', noKey: true },
   ];
 
@@ -31,7 +33,7 @@
     const seen = new Set();
     (saved || []).forEach(s => {
       const def = PROVIDERS.find(p => p.id === s.id);
-      if (def) { out.push({ ...def, ...s, keyUrl: def.keyUrl, noKey: def.noKey, format: def.format }); seen.add(s.id); }
+      if (def) { out.push({ ...def, ...s, keyUrl: def.keyUrl, noKey: def.noKey, format: def.format, paid: def.paid, extra: def.extra }); seen.add(s.id); }
       else if (s.custom) { out.push(s); seen.add(s.id); }
     });
     PROVIDERS.forEach(p => { if (!seen.has(p.id)) out.push({ ...p, key: '', enabled: true }); });
@@ -136,6 +138,7 @@
     }
     const request = { model: p.model, messages, temperature: opts.temperature ?? 0.5, max_tokens: local ? 400 : (opts.maxTokens || 2048) };
     if (local) request.keep_alive = '30m';
+    if (p.extra) Object.assign(request, p.extra); // provider-specific settings, e.g. GLM's thinking switch
     try {
       const res = await fetch(p.base.replace(/\/$/, '') + '/chat/completions', {
         method: 'POST',

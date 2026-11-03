@@ -62,6 +62,7 @@ Open Splash AI on the laptop, go to **Settings, Models**. Each model has a **Get
 | Mistral | console.mistral.ai/api-keys |
 | GitHub Models (a GitHub token) | github.com/settings/tokens |
 | Hugging Face | huggingface.co/settings/tokens |
+| GLM 5.2 by Z.ai (paid) | z.ai/manage-apikey/apikey-list |
 | Claude (paid, pay per use, needs credit on your Anthropic account) | platform.claude.com/settings/keys |
 | Ollama, on your laptop | no key |
 

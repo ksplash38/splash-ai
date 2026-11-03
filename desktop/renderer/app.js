@@ -328,7 +328,7 @@ function renderProviders(status = []) {
         <input data-model="${i}" value="${esc(p.model)}" aria-label="Model name">
       </div>
       <div class="status ${resting || (st.last && st.last !== 'ok') ? 'warn' : ''}">${statusText}
-        ${resting ? ` <a data-wake="${p.id}">Try it now</a>` : ''} <a data-link="${esc(p.keyUrl)}">${p.noKey ? 'Download' : p.format === 'anthropic' ? 'Get a key (paid)' : 'Get a free key'}</a></div>
+        ${resting ? ` <a data-wake="${p.id}">Try it now</a>` : ''} <a data-link="${esc(p.keyUrl)}">${p.noKey ? 'Download' : p.paid ? 'Get a key (paid)' : 'Get a free key'}</a></div>
     </div>`;
   }).join('');
   box.querySelectorAll('[data-en]').forEach(el => el.onchange = () => (draft.providers[+el.dataset.en].enabled = el.checked));
