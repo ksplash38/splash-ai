@@ -90,7 +90,7 @@
         actions = actions.filter(x => x && typeof x === 'object').map(x => ({ ...x, type: x.type || x.action || x.name }));
         const ignore = j.ignore === true || j.ignore === 'true';
         const listen = ['sleep', 'off'].includes(String(j.listen || '').toLowerCase()) ? String(j.listen).toLowerCase() : '';
-        return { say: ignore ? '' : String(j.say || j.reply || ''), explain: ignore ? '' : String(j.explain || '').trim(), visual: ignore ? null : cleanVisual(j.visual),
+        return { say: ignore ? '' : String(j.say || j.reply || ''), explain: ignore ? '' : String(j.explain || '').replace(/\*\*|__/g, '').trim(), visual: ignore ? null : cleanVisual(j.visual),
           actions: ignore ? [] : actions, note: ignore ? '' : String(j.note || ''),
           learn: ignore ? '' : String(j.learn || ''), ignore, listen, expectReply: j.expect_reply === true || j.expect_reply === 'true' };
       } catch (e) { /* fall through */ }
@@ -135,10 +135,11 @@
     open: '(picked up by the open microphone WITHOUT your wake word; it may be Kelvin talking to someone else or to himself. Set "ignore" unless it is clearly meant for you, e.g. a follow-up to what you just said, a question to you, or uses your name)',
   };
   // compactPrompt (optional): the short instructions used instead when a local Ollama model answers.
-  async function runTurn({ router, history, userText, systemPrompt, compactPrompt, execute, maxSteps = 8, onStep, heard = 'typed' }) {
+  // documents (optional): text from files he attached, sent with this question only.
+  async function runTurn({ router, history, userText, systemPrompt, compactPrompt, documents, execute, maxSteps = 8, onStep, heard = 'typed' }) {
     const msgs = [{ role: 'system', content: systemPrompt }];
     (history || []).slice(-24).forEach(m => msgs.push({ role: m.role, content: m.content }));
-    msgs.push({ role: 'user', content: userText + '\n' + (HEARD[heard] || HEARD.typed) });
+    msgs.push({ role: 'user', content: userText + '\n' + (HEARD[heard] || HEARD.typed) + (documents ? '\n\n' + documents : '') });
     const out = { say: '', explain: '', visual: null, notes: [], lessons: [], steps: [], provider: '', model: '', ignored: false, listen: '', expectReply: false };
     const says = [];
     for (let step = 0; step < maxSteps; step++) {

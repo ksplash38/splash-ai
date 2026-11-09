@@ -4,7 +4,7 @@
   "private": true,
   "description": "Splash AI for Android",
   "scripts": {
-    "sync": "node ../scripts/sync-shared.js",
+    "sync": "node ../scripts/sync-shared.js && node scripts/copy-vendor.js",
     "setup": "npm run sync && npx cap add android && node scripts/patch-android.js && npx cap sync android",
     "apk": "npm run sync && node scripts/patch-android.js && npx cap sync android && cd android && gradlew.bat assembleDebug"
   },
@@ -15,7 +15,9 @@
     "@capacitor/android": "^6.2.0",
     "@capacitor/app-launcher": "^6.0.3",
     "@capacitor/core": "^6.2.0",
-    "@capacitor/share": "^6.0.3"
+    "@capacitor/share": "^6.0.3",
+    "mammoth": "1.13.0",
+    "pdfjs-dist": "4.10.38"
   },
   "devDependencies": {
     "@capacitor/cli": "^6.2.0"

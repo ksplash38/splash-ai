@@ -20,8 +20,13 @@
         <p id="liveText" class="live"></p>
       </div>
       <div id="messages" class="messages"></div>
+      <div id="docChips" class="docchips" hidden></div>
+      <input id="docPicker" type="file" hidden accept="application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/*">
       <form id="askForm" class="askbar" autocomplete="off">
         <button type="button" id="handsFree" class="hf" aria-pressed="false" title="Hands-free: listen for the wake word">Wake</button>
+        <button type="button" id="attachBtn" class="attach" aria-label="Attach a document">
+          <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M21 11.5 12.5 20a5.5 5.5 0 0 1-7.8-7.8l8.5-8.5a3.7 3.7 0 0 1 5.2 5.2l-8.5 8.5a1.8 1.8 0 0 1-2.6-2.6l7.8-7.8"/></svg>
+        </button>
         <input id="askInput" placeholder="Type a command">
         <button class="send">Send</button>
       </form>
@@ -107,6 +112,7 @@
   <script src="shared/router.js"></script>
   <script src="shared/brain.js"></script>
   <script src="shared/visual.js"></script>
+  <script src="shared/docs.js"></script>
   <script src="shared/core.js"></script>
   <script src="app.js"></script>
 </body>

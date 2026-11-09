@@ -1,4 +1,4 @@
-const { contextBridge, ipcRenderer } = require('electron');
+const { contextBridge, ipcRenderer, webUtils } = require('electron');
 
 const invoke = (ch) => (...args) => ipcRenderer.invoke(ch, ...args);
 
@@ -22,11 +22,14 @@ contextBridge.exposeInMainWorld('splash', {
   naturalVoices: invoke('natural-voices'),
   tts: invoke('tts'),
   pairingInfo: invoke('pairing-info'),
+  attachDocument: invoke('attach-document'),
+  detachDocument: invoke('detach-document'),
+  pathForFile: file => webUtils.getPathForFile(file),
   modelUrl: invoke('model-url'),
   openExternal: invoke('open-external'),
   openDataFolder: invoke('open-data-folder'),
   on: (ch, fn) => {
-    const ok = ['confirm', 'step', 'fallback', 'trying', 'ptt', 'remote', 'history-changed', 'toast', 'model-progress', 'paired'];
+    const ok = ['confirm', 'step', 'fallback', 'trying', 'ptt', 'remote', 'history-changed', 'toast', 'model-progress', 'paired', 'research-progress', 'doc-progress'];
     if (ok.includes(ch)) ipcRenderer.on(ch, (_, data) => fn(data));
   },
 });

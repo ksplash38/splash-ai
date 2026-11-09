@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, Tray, Menu, globalShortcut, shell, session, nativeImage } = require('electron');
+const { app, BrowserWindow, ipcMain, Tray, Menu, globalShortcut, shell, session, nativeImage, dialog } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const os = require('os');
@@ -6,6 +6,8 @@ const http = require('http');
 const https = require('https');
 const crypto = require('crypto');
 const { Store } = require('./store');
+const { writePaper } = require('./research');
+const { readDocument, saveExtract, removeExtract, loadExtract, summaryOf, documentContext, TEXT_TYPES } = require('./documents');
 const { ACTIONS_DOC, contextLine, makeExecutor } = require('./tools');
 const { Router } = require('./shared/router.js');
 const { buildSystemPrompt, runTurn } = require('./shared/brain.js');
@@ -36,6 +38,17 @@ function getRouter() {
   return router;
 }
 
+const docsDir = () => path.join(store.dataDir, 'attached documents');
+
+async function attachDocument(filePath) {
+  const doc = await readDocument(filePath);
+  saveExtract(docsDir(), doc);
+  conv.docs = [...(conv.docs || []), summaryOf(doc)];
+  store.saveConversation(conv);
+  return doc;
+}
+function removeConversationDocs(c) { ((c && c.docs) || []).forEach(d => removeExtract(docsDir(), d.id)); }
+
 async function ask(text, { c, source, confirm, onStep, heard = 'typed' }) {
   const promptInfo = {
     names: store.config.names,
@@ -49,9 +62,19 @@ async function ask(text, { c, source, confirm, onStep, heard = 'typed' }) {
   const systemPrompt = buildSystemPrompt(promptInfo);
   const compactPrompt = buildSystemPrompt({ ...promptInfo, compact: true });
   const history = c.messages.map(m => ({ role: m.role, content: m.content }));
+  const hasDocs = !!(c.docs && c.docs.length);
+  const lastAsked = [...c.messages].reverse().find(m => m.role === 'user');
+  const documents = hasDocs ? await documentContext({
+    docs: c.docs, question: text, previous: lastAsked ? lastAsked.content : '', router: getRouter(),
+    load: id => loadExtract(docsDir(), id), save: doc => saveExtract(docsDir(), doc),
+    onProgress: t => send('doc-progress', t),
+  }) : '';
   const res = await runTurn({
-    router: getRouter(), history, userText: text, systemPrompt, compactPrompt,
-    execute: makeExecutor({ store, confirm }), onStep, heard,
+    router: getRouter(), history, userText: text, systemPrompt, compactPrompt, documents,
+    execute: makeExecutor({ store, confirm, documentOpen: hasDocs, research: a => writePaper({
+      router: getRouter(), topic: a.topic, length: a.length, instructions: a.instructions,
+      outDir: path.join(store.dataDir, 'Research'), onProgress: t => send('research-progress', t),
+    }) }), onStep, heard,
   });
   if (res.ignored) return res; // not meant for us: keep it out of the conversation
   const at = new Date().toISOString();
@@ -391,13 +414,34 @@ function registerIpc() {
   });
   ipcMain.handle('new-conversation', () => { conv = store.newConversation(); return publicState(); });
   ipcMain.handle('open-conversation', (_, id) => { const c = store.getConversation(id); if (c) conv = c; return publicState(); });
+  // Attach from the paperclip (no path: show the file picker) or from drag-and-drop (path given).
+  ipcMain.handle('attach-document', async (_, dropped) => {
+    let file = dropped;
+    if (!file) {
+      const pick = await dialog.showOpenDialog(win, { properties: ['openFile'], filters: [{ name: 'Documents', extensions: ['pdf', 'docx', ...TEXT_TYPES.map(t => t.slice(1))] }] });
+      if (pick.canceled || !pick.filePaths[0]) return { ok: false, canceled: true };
+      file = pick.filePaths[0];
+    }
+    if ((conv.docs || []).length >= 5) return { ok: false, error: 'Five documents is the limit for one conversation. Remove one first.' };
+    try {
+      const doc = await attachDocument(file);
+      return { ok: true, name: doc.name, count: doc.pages.length, unit: doc.unit, blank: doc.blank, state: publicState() };
+    } catch (e) { return { ok: false, error: String(e.message || e) }; }
+  });
+  ipcMain.handle('detach-document', (_, docId) => {
+    removeExtract(docsDir(), docId);
+    conv.docs = (conv.docs || []).filter(d => d.id !== docId);
+    store.saveConversation(conv);
+    return publicState();
+  });
   ipcMain.handle('delete-conversation', (_, id) => {
+    removeConversationDocs(store.getConversation(id));
     store.deleteConversation(id);
     if (conv.id === id) conv = store.newConversation();
     return publicState();
   });
   ipcMain.handle('delete-all-history', () => {
-    store.listConversations().forEach(c => store.deleteConversation(c.id));
+    store.listConversations().forEach(c => { removeConversationDocs(store.getConversation(c.id)); store.deleteConversation(c.id); });
     conv = store.newConversation();
     return publicState();
   });

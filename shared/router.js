@@ -134,7 +134,8 @@
     const local = !!p.noKey;
     if (local && opts.compactSystem) {
       const rest = messages.filter(m => m.role !== 'system');
-      messages = [{ role: 'system', content: opts.compactSystem }, ...rest.slice(-6)];
+      // A small local model can't take a whole document; the most relevant text comes first.
+      messages = [{ role: 'system', content: opts.compactSystem }, ...rest.slice(-6).map(m => ({ ...m, content: String(m.content).slice(0, 5000) }))];
     }
     const request = { model: p.model, messages, temperature: opts.temperature ?? 0.5, max_tokens: local ? 400 : (opts.maxTokens || 2048) };
     if (local) request.keep_alive = '30m';
@@ -197,7 +198,8 @@
       const resting = this.config.providers
         .filter(p => p.enabled && (p.key || p.noKey) && !ready.includes(p))
         .sort((a, b) => ((this.state[a.id] || {}).until || 0) - ((this.state[b.id] || {}).until || 0));
-      const list = ready.concat(resting);
+      let list = ready.concat(resting);
+      if (opts.skipLocal) list = list.filter(p => !p.noKey); // long jobs are too slow for a laptop's own processor
       if (!list.length) throw new Error('No models set up yet. Open Settings and paste at least one free API key, or install Ollama.');
       const errors = [];
       for (let i = 0; i < list.length; i++) {

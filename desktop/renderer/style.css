@@ -47,6 +47,11 @@ button, input, select { font: inherit; color: inherit; }
 .listen { display: inline-flex; align-items: center; gap: 6px; height: 40px; padding: 0 14px 0 10px; border-radius: 20px; border: 1px solid var(--line); background: none; color: var(--mist); cursor: pointer; white-space: nowrap; }
 .listen:hover { color: var(--foam); border-color: var(--mist); }
 .listen.off { background: var(--coral); border-color: var(--coral); color: var(--abyss); font-weight: 600; }
+.docchips { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 32px -4px; flex: none; }
+.docchip { display: inline-flex; align-items: center; gap: 6px; max-width: 320px; background: var(--reef); border: 1px solid var(--line); border-radius: 16px; padding: 3px 4px 3px 12px; font-size: 13px; }
+.docchip span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.docchip small { color: var(--mist); white-space: nowrap; }
+body.dropping .stage { outline: 2px dashed var(--aqua); outline-offset: -10px; }
 .send { border: 0; background: var(--aqua); color: var(--abyss); font-weight: 600; padding: 0 18px; border-radius: 20px; cursor: pointer; }
 
 .panel { position: relative; background: var(--tide); border-left: 1px solid var(--line); display: flex; flex-direction: column; min-height: 0; min-width: 0; }

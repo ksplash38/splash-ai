@@ -10,6 +10,7 @@ desktop/electron.zip
 desktop/src/shared/
 desktop/renderer/shared/
 mobile/www/shared/
+mobile/www/vendor/
 
 *.log
 .DS_Store

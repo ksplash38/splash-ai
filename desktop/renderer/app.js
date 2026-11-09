@@ -84,6 +84,7 @@ if (recall('panelHidden') === '1') setPanelHidden(true);
 
 // ---------- chat ----------
 function renderChat() {
+  renderDocs();
   $('#convTitle').textContent = S.conv.title;
   const box = $('#messages');
   if (!S.conv.messages.length) {
@@ -100,6 +101,36 @@ function renderChat() {
   }).join('');
   box.scrollTop = box.scrollHeight;
 }
+// ---------- attached documents ----------
+function renderDocs() {
+  const docs = S.conv.docs || [], box = $('#docChips');
+  box.hidden = !docs.length;
+  box.innerHTML = docs.map(d => `<div class="docchip" title="${esc(d.name)}"><span>${esc(d.name)}</span><small>${d.count} ${d.unit}${d.count === 1 ? '' : 's'}</small><button class="x" data-doc="${esc(d.id)}" aria-label="Remove ${esc(d.name)}">✕</button></div>`).join('');
+  box.querySelectorAll('[data-doc]').forEach(b => b.onclick = async () => { S = await api.detachDocument(b.dataset.doc); renderDocs(); });
+}
+async function attachDocument(filePath) {
+  if (filePath) $('#liveText').textContent = 'Opening your document';
+  const r = await api.attachDocument(filePath);
+  if (r.canceled) return;
+  if (!r.ok) { $('#liveText').textContent = ''; return toast(r.error, 9000); }
+  S = r.state; renderDocs();
+  $('#liveText').textContent = `${r.name} is ready. Ask me anything about it.`;
+  $('#askInput').placeholder = 'Ask about your document, e.g. explain this to me';
+  $('#askInput').focus();
+  if (r.blank.length) toast(`Heads up: ${r.unit}s ${r.blank.slice(0, 10).join(', ')}${r.blank.length > 10 ? '…' : ''} are pictures, so I can't read those.`, 9000);
+}
+$('#attachBtn').onclick = () => attachDocument();
+let dragDepth = 0;
+const hasFile = e => e.dataTransfer && [...e.dataTransfer.types].includes('Files');
+window.addEventListener('dragenter', e => { if (hasFile(e)) { dragDepth++; document.body.classList.add('dropping'); } });
+window.addEventListener('dragleave', e => { if (hasFile(e) && --dragDepth <= 0) { dragDepth = 0; document.body.classList.remove('dropping'); } });
+window.addEventListener('dragover', e => e.preventDefault());
+window.addEventListener('drop', e => {
+  e.preventDefault(); dragDepth = 0; document.body.classList.remove('dropping');
+  const f = e.dataTransfer.files[0];
+  if (f) attachDocument(api.pathForFile(f));
+});
+
 function pushBubble(role, text) {
   const box = $('#messages');
   if (box.querySelector('.empty')) box.innerHTML = '';
@@ -411,6 +442,8 @@ api.on('ptt', () => startTalking());
 api.on('remote', r => toast('Phone: ' + r.text));
 api.on('history-changed', async () => { S = await api.getState(); renderHistory(); renderMemory(); });
 api.on('toast', t => toast(t, 6000));
+api.on('doc-progress', t => { setState('thinking', 'Reading your document'); $('#liveText').textContent = t; });
+api.on('research-progress', t => { setState('thinking', 'Working on your research paper'); $('#liveText').textContent = t; });
 api.on('model-progress', f => { $('#stateLabel').textContent = `Downloading the voice model, ${Math.round(f * 100)}%`; });
 
 // ---------- start ----------

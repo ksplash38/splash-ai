@@ -19,6 +19,7 @@ const ACTIONS_DOC = `- {"type":"list","path":"C:\\\\Users\\\\..."}  list a folde
 - {"type":"url","url":"https://..."}  open a website in the browser
 - {"type":"run","command":"..."}  run a PowerShell command and get its output. Use it for launching apps (Start-Process), processes, volume, Wi-Fi, installing software (winget), system settings, typing keys, and anything the other actions don't cover
 - {"type":"clipboard_set","text":"..."} and {"type":"clipboard_get"}
+- {"type":"research_paper","topic":"...","length":"short|medium|long","instructions":"any extra wishes, or empty"}  research real published papers and write a referenced Word document (takes a few minutes). ALWAYS use this when he asks for research or a research paper or essay with references; never write one yourself or invent references. Lengths are about 1500, 3000 or 6000 words; use medium if he doesn't say. If the topic is unclear, ask him first.
 - {"type":"screenshot"}  save a screenshot to Pictures\\Splash AI
 - {"type":"notify","title":"...","text":"..."}  show a Windows notification
 - {"type":"sysinfo"}  computer details: user, folders, drives, memory
@@ -95,13 +96,18 @@ function describe(a) {
   }
 }
 
-function makeExecutor({ store, confirm }) {
+const LOOK_ONLY = new Set(['list', 'read', 'find', 'sysinfo']);
+
+// documentOpen: a file he attached is part of this turn, and files can contain hidden
+// instructions, so anything beyond looking needs his OK even if confirmations are off.
+function makeExecutor({ store, confirm, research, documentOpen }) {
   return async function execute(a) {
     const type = String(a.type || '').toLowerCase();
     let risky = type === 'delete' || type === 'run';
     if (type === 'write') { try { risky = fs.existsSync(fullPath(a.path)); } catch {} }
-    if (risky && store.config.confirmDangerous) {
-      const ok = await confirm(describe({ ...a, type }));
+    const guarded = documentOpen && !LOOK_ONLY.has(type);
+    if (guarded || (risky && store.config.confirmDangerous)) {
+      const ok = await confirm((guarded ? 'A document is attached. Make sure you asked for this:\n' : '') + describe({ ...a, type }));
       if (!ok) return { ok: false, result: 'Kelvin declined this action. Do not retry it.' };
     }
     switch (type) {
@@ -175,6 +181,12 @@ function makeExecutor({ store, confirm }) {
       }
       case 'run': case 'powershell': case 'cmd':
         return powershell(a.command || a.cmd || '', (a.timeoutSeconds || 120) * 1000);
+      case 'research_paper': {
+        if (!research) return { ok: false, result: 'Research is not available here.' };
+        const r = await research(a);
+        shell.openPath(r.file);
+        return { ok: true, result: `Saved and opened "${r.title}" at ${r.file}: about ${r.words} words, ${r.cited} real sources cited out of ${r.found} found. It was written from the papers' abstracts, so he should read it and check the key claims.` };
+      }
       case 'clipboard_set': clipboard.writeText(String(a.text || '')); return { ok: true, result: 'Copied to clipboard.' };
       case 'clipboard_get': return { ok: true, result: clipboard.readText() || '(clipboard is empty)' };
       case 'screenshot': {

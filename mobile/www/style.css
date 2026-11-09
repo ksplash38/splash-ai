@@ -56,6 +56,11 @@ main { flex: 1; min-height: 0; position: relative; }
 .empty { color: var(--mist); }
 
 .askbar { display: flex; gap: 6px; margin: 8px 12px; padding: 5px; background: var(--tide); border: 1px solid var(--line); border-radius: 26px; }
+.attach { flex: none; width: 36px; height: 36px; border: 0; border-radius: 50%; background: var(--reef); color: var(--aqua); display: grid; place-items: center; }
+.docchips { display: flex; flex-wrap: wrap; gap: 6px; margin: 6px 12px 0; }
+.docchip { display: inline-flex; align-items: center; gap: 6px; max-width: 100%; min-width: 0; background: var(--reef); border: 1px solid var(--line); border-radius: 16px; padding: 3px 4px 3px 12px; font-size: 13px; }
+.docchip span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.docchip small { color: var(--mist); white-space: nowrap; }
 .askbar input { flex: 1; min-width: 0; background: none; border: 0; outline: none; padding: 0 6px; }
 .hf { border: 1px solid var(--line); background: none; border-radius: 20px; padding: 6px 12px; color: var(--mist); }
 .hf[aria-pressed="true"] { background: var(--aqua); color: var(--abyss); border-color: var(--aqua); }

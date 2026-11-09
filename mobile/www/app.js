@@ -101,8 +101,9 @@ async function checkLink() {
   try { const j = await lap('/api/ping'); $('#linkBadge').textContent = 'Linked to ' + j.computer; $('#linkBadge').classList.add('ok'); return true; }
   catch { $('#linkBadge').textContent = lapBase() ? 'Laptop offline' : 'Laptop not linked'; $('#linkBadge').classList.remove('ok'); return false; }
 }
-function askConfirm(text) {
+function askConfirm(text, title = 'Your laptop asks: go ahead?') {
   return new Promise(resolve => {
+    $('#confirmBox h2').textContent = title;
     $('#confirmText').textContent = text; $('#confirmBox').hidden = false;
     $('#confirmYes').onclick = () => { $('#confirmBox').hidden = true; resolve(true); };
     $('#confirmNo').onclick = () => { $('#confirmBox').hidden = true; resolve(false); };
@@ -181,6 +182,82 @@ async function execute(a) {
       return { ok: false, result: 'Unknown action ' + a.type };
   }
 }
+
+// ---------- attached documents ----------
+// The extracted text is kept in IndexedDB; the conversation only keeps a short record.
+const docDb = new Promise((ok, no) => {
+  const r = indexedDB.open('splash-docs', 1);
+  r.onupgradeneeded = () => r.result.createObjectStore('docs', { keyPath: 'id' });
+  r.onsuccess = () => ok(r.result); r.onerror = () => no(r.error);
+});
+async function docRequest(mode, fn) {
+  const db = await docDb;
+  return new Promise((ok, no) => { const q = fn(db.transaction('docs', mode).objectStore('docs')); q.onsuccess = () => ok(q.result); q.onerror = () => no(q.error); });
+}
+const loadDoc = id => docRequest('readonly', s => s.get(id));
+const saveDoc = doc => docRequest('readwrite', s => s.put(doc));
+const removeDoc = id => docRequest('readwrite', s => s.delete(id));
+const dropDocs = c => ((c && c.docs) || []).forEach(d => removeDoc(d.id));
+
+async function readPdfFile(file) {
+  const pdfjs = await import('./vendor/pdf.min.js');
+  pdfjs.GlobalWorkerOptions.workerSrc = new URL('vendor/pdf.worker.min.js', location.href).href;
+  let pdf;
+  try { pdf = await pdfjs.getDocument({ data: await file.arrayBuffer(), isEvalSupported: false }).promise; }
+  catch (e) { throw SplashDocs.pdfError(e); }
+  const pages = [];
+  for (let n = 1; n <= pdf.numPages; n++) {
+    const content = await (await pdf.getPage(n)).getTextContent();
+    pages.push({ n, text: SplashDocs.tidy(content.items.map(i => i.str + (i.hasEOL ? '\n' : ' ')).join('')) });
+  }
+  return pages;
+}
+function loadMammoth() {
+  return window.mammoth ? Promise.resolve() : new Promise((ok, no) => {
+    const s = document.createElement('script'); s.src = 'vendor/mammoth.browser.min.js'; s.onload = ok; s.onerror = no; document.head.appendChild(s);
+  });
+}
+async function readDocumentFile(file) {
+  if (file.size > 30 * 1024 * 1024) throw new Error('That file is over 30 MB, which is too big for the phone.');
+  const dot = file.name.lastIndexOf('.');
+  const ext = dot > -1 ? file.name.slice(dot).toLowerCase() : file.type === 'application/pdf' ? '.pdf' : file.type.startsWith('text/') ? '.txt' : '';
+  if (ext === '.pdf') return SplashDocs.finishDocument(file.name, 'page', await readPdfFile(file));
+  if (ext === '.docx') {
+    await loadMammoth();
+    let r;
+    try { r = await mammoth.extractRawText({ arrayBuffer: await file.arrayBuffer() }); }
+    catch { throw new Error('This Word file looks damaged, so I could not open it.'); }
+    return SplashDocs.finishDocument(file.name, 'part', SplashDocs.toParts(r.value));
+  }
+  if (SplashDocs.TEXT_TYPES.includes(ext)) return SplashDocs.finishDocument(file.name, 'part', SplashDocs.toParts(await file.text()));
+  throw SplashDocs.unsupported(ext);
+}
+function renderDocs() {
+  const c = currentConv(), docs = c.docs || [], box = $('#docChips');
+  box.hidden = !docs.length;
+  box.innerHTML = docs.map(d => `<div class="docchip"><span>${esc(d.name)}</span><small>${d.count} ${d.unit}${d.count === 1 ? '' : 's'}</small><button class="x" data-doc="${esc(d.id)}" aria-label="Remove ${esc(d.name)}">✕</button></div>`).join('');
+  box.querySelectorAll('[data-doc]').forEach(b => b.onclick = () => {
+    removeDoc(b.dataset.doc);
+    c.docs = c.docs.filter(d => d.id !== b.dataset.doc);
+    save(); renderDocs();
+  });
+}
+async function attachFile(file) {
+  const c = currentConv();
+  if ((c.docs || []).length >= 5) return toast('Five documents is the limit for one conversation. Remove one first.', 6000);
+  $('#liveText').textContent = 'Opening your document';
+  try {
+    const doc = await readDocumentFile(file);
+    await saveDoc(doc);
+    c.docs = [...(c.docs || []), SplashDocs.summaryOf(doc)];
+    save(); renderDocs();
+    $('#liveText').textContent = `${doc.name} is ready. Ask me anything about it.`;
+    $('#askInput').placeholder = 'Ask about your document';
+    if (doc.blank.length) toast(`Heads up: ${doc.unit}s ${doc.blank.slice(0, 10).join(', ')}${doc.blank.length > 10 ? '…' : ''} are pictures, so I can't read those.`, 8000);
+  } catch (e) { $('#liveText').textContent = ''; toast(e.message, 8000); }
+}
+$('#attachBtn').onclick = () => $('#docPicker').click();
+$('#docPicker').onchange = e => { const f = e.target.files[0]; e.target.value = ''; if (f) attachFile(f); };
 
 // ---------- the brain ----------
 const router = new SplashRouter.Router({ providers: D.config.providers }, D.routerState, (ev, data) => {
@@ -262,8 +339,17 @@ async function handle(text, heard = 'typed') {
       lessons: D.memory.lessons, facts: D.memory.facts,
       recentNotes: [...D.laptopNotes.slice(-20), ...D.notes.slice(-10).map(n => `[phone ${n.at.slice(0, 10)}] ${n.text}`)],
     };
+    const hasDocs = !!(c.docs && c.docs.length);
+    const lastAsked = [...c.messages].reverse().find(m => m.role === 'user');
+    const documents = hasDocs ? await SplashDocs.documentContext({
+      docs: c.docs, question: text, previous: lastAsked ? lastAsked.content : '', router, load: loadDoc, save: saveDoc,
+      onProgress: t => { $('#liveText').textContent = t; },
+    }) : '';
+    // Files can contain hidden instructions, so with one attached every action needs his OK.
+    const run = hasDocs ? async a => (await askConfirm('A document is attached. Make sure you asked for this:\n' + a.type + ': ' + JSON.stringify(a), 'Go ahead with this?'))
+      ? execute(a) : { ok: false, result: 'Kelvin declined this action. Do not retry it.' } : execute;
     const res = await SplashBrain.runTurn({
-      router, history: c.messages.map(m => ({ role: m.role, content: m.content })), userText: text, execute, heard,
+      router, history: c.messages.map(m => ({ role: m.role, content: m.content })), userText: text, execute: run, heard, documents,
       systemPrompt: SplashBrain.buildSystemPrompt(promptInfo),
       compactPrompt: SplashBrain.buildSystemPrompt({ ...promptInfo, compact: true }),
     });
@@ -372,6 +458,7 @@ function pushBubble(role, text) {
   const d = document.createElement('div'); d.className = 'msg ' + role; d.textContent = text; box.appendChild(d); box.scrollTop = box.scrollHeight;
 }
 function renderChat() {
+  renderDocs();
   const c = currentConv(), box = $('#messages');
   if (!c.messages.length) { box.innerHTML = '<p class="empty">Tap the core and talk, or type below. Try “on my laptop, make a folder called Receipts on the desktop”.</p>'; return; }
   box.innerHTML = c.messages.map(m => {
@@ -388,7 +475,7 @@ function renderHistory() {
   if (!list.length) { ul.innerHTML = '<p class="empty">Your conversations will show up here.</p>'; return; }
   ul.innerHTML = list.map(c => `<li><div class="grow" data-open="${c.id}">${esc(c.title)}<small>${when(c.updated)}, ${c.messages.length} messages${c.source === 'phone' ? '' : ', from laptop'}</small></div><button class="x" data-del="${c.id}" aria-label="Delete">✕</button></li>`).join('');
   ul.querySelectorAll('[data-open]').forEach(el => el.onclick = () => { D.currentId = el.dataset.open; save(); renderChat(); document.querySelector('[data-view=talk]').click(); });
-  ul.querySelectorAll('[data-del]').forEach(el => el.onclick = () => { if (!confirm('Delete this conversation on the phone?')) return; delete D.conversations[el.dataset.del]; if (D.currentId === el.dataset.del) D.currentId = null; save(); renderHistory(); renderChat(); });
+  ul.querySelectorAll('[data-del]').forEach(el => el.onclick = () => { if (!confirm('Delete this conversation on the phone?')) return; dropDocs(D.conversations[el.dataset.del]); delete D.conversations[el.dataset.del]; if (D.currentId === el.dataset.del) D.currentId = null; save(); renderHistory(); renderChat(); });
 }
 $('#newConv').onclick = () => { D.currentId = null; currentConv(); save(); renderChat(); document.querySelector('[data-view=talk]').click(); };
 function renderNotes() {
@@ -519,7 +606,7 @@ $('#pinGo').onclick = () => {
   if (!addr) return toast('Type the address shown on the laptop, e.g. 192.168.1.20', 5000);
   doPair([addr], $('#pinCode').value);
 };
-$('#wipeAll').onclick = () => { if (!confirm('Delete all conversations and notes on this phone? Memory and settings stay.')) return; D.conversations = {}; D.notes = []; D.laptopNotes = []; D.currentId = null; save(); renderChat(); toast('Phone history deleted'); };
+$('#wipeAll').onclick = () => { if (!confirm('Delete all conversations and notes on this phone? Memory and settings stay.')) return; Object.values(D.conversations).forEach(dropDocs); D.conversations = {}; D.notes = []; D.laptopNotes = []; D.currentId = null; save(); renderChat(); toast('Phone history deleted'); };
 
 // ---------- start ----------
 renderChat();

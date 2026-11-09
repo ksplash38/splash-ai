@@ -11,8 +11,11 @@
     "dist": "npm run sync && electron-builder --win nsis portable"
   },
   "dependencies": {
+    "docx": "9.5.1",
+    "mammoth": "1.13.0",
     "msedge-tts": "2.1.1",
     "qrcode": "1.5.4",
+    "unpdf": "2.1.0",
     "vosk-browser": "~0.0.5"
   },
   "devDependencies": {
