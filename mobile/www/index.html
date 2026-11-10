@@ -86,6 +86,16 @@
       <h2>Models</h2>
       <p class="hint">Top to bottom is the order it tries them. Paste keys, or copy them from your laptop above.</p>
       <div id="providerList"></div>
+      <details class="pinpair">
+        <summary>Add your own AI</summary>
+        <p class="hint">Found another AI service? On its website, look for "API", "API keys" and its "OpenAI-compatible" base URL (the address).</p>
+        <input id="cmName" class="wide" placeholder="Name, e.g. Cerebras or DeepSeek">
+        <input id="cmBase" class="wide" placeholder="Address, e.g. https://api.example.com/v1" inputmode="url">
+        <input id="cmModel" class="wide" placeholder="Model name, exactly as the service writes it">
+        <input id="cmKey" class="wide" type="password" placeholder="API key (empty if it needs none)">
+        <div class="btnrow"><button id="cmTest" class="ghost">Test</button><button id="cmAdd" class="ghost">Add</button></div>
+        <p id="cmResult" class="hint"></p>
+      </details>
 
       <div class="savebar"><button id="saveSettings" class="primary">Save settings</button></div>
       <button id="wipeAll" class="ghost danger">Delete all history on this phone</button>

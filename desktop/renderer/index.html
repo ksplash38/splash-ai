@@ -95,6 +95,16 @@
         <h2>Models</h2>
         <p class="hint">Top to bottom is the order it tries them. When one runs out, the next takes over. Paste a free key to switch a model on.</p>
         <div id="providerList"></div>
+        <details class="addmodel">
+          <summary>Add your own AI</summary>
+          <p class="hint">Found another AI service? On its website, look for "API", "API keys" and its "OpenAI-compatible" base URL (the address). Fill these in, press Test, then Add and Save settings.</p>
+          <input id="cmName" class="wide" placeholder="Name, e.g. Cerebras or DeepSeek">
+          <input id="cmBase" class="wide" placeholder="Address (base URL), e.g. https://api.example.com/v1" inputmode="url">
+          <input id="cmModel" class="wide" placeholder="Model name, exactly as the service writes it">
+          <input id="cmKey" class="wide" type="password" placeholder="API key (leave empty if it needs none)">
+          <div class="row" style="justify-content:flex-start"><button id="cmTest" class="ghost">Test</button><button id="cmAdd" class="primary">Add</button></div>
+          <p id="cmResult" class="hint" aria-live="polite"></p>
+        </details>
 
         <h2>Behaviour</h2>
         <label class="toggle"><input type="checkbox" id="optConfirm"> Ask me before deleting files, overwriting files or running commands</label>

@@ -10,16 +10,13 @@
 })(typeof self !== 'undefined' ? self : this, function () {
   // Model names change over time. If one stops working, edit it in Settings.
   const PROVIDERS = [
-    { id: 'gemini', name: 'Google Gemini', base: 'https://generativelanguage.googleapis.com/v1beta/openai', model: 'gemini-2.5-flash', keyUrl: 'https://aistudio.google.com/apikey' },
+    { id: 'gemini', name: 'Google Gemini', base: 'https://generativelanguage.googleapis.com/v1beta/openai', model: 'gemini-2.5-flash', keyUrl: 'https://aistudio.google.com/apikey', vision: true },
     { id: 'groq', name: 'Groq', base: 'https://api.groq.com/openai/v1', model: 'llama-3.3-70b-versatile', keyUrl: 'https://console.groq.com/keys' },
     { id: 'openrouter', name: 'OpenRouter (free models)', base: 'https://openrouter.ai/api/v1', model: 'meta-llama/llama-3.3-70b-instruct:free', keyUrl: 'https://openrouter.ai/keys' },
-    { id: 'mistral', name: 'Mistral', base: 'https://api.mistral.ai/v1', model: 'mistral-small-latest', keyUrl: 'https://console.mistral.ai/api-keys' },
-    { id: 'github', name: 'GitHub Models', base: 'https://models.github.ai/inference', model: 'openai/gpt-4.1-mini', keyUrl: 'https://github.com/settings/tokens' },
-    { id: 'huggingface', name: 'Hugging Face', base: 'https://router.huggingface.co/v1', model: 'meta-llama/Llama-3.3-70B-Instruct', keyUrl: 'https://huggingface.co/settings/tokens' },
     // Z.ai's GLM. Thinks before answering by default, which is slow for voice, so that is switched off.
     { id: 'glm', name: 'GLM 5.2 (Z.ai)', base: 'https://api.z.ai/api/paas/v4', model: 'glm-5.2', keyUrl: 'https://z.ai/manage-apikey/apikey-list', paid: true, extra: { thinking: { type: 'disabled' } } },
     // Paid (pay per use, needs credit on the account). Speaks Anthropic's own Messages API, not /chat/completions.
-    { id: 'claude', name: 'Claude (paid)', base: 'https://api.anthropic.com/v1', model: 'claude-opus-5-5', keyUrl: 'https://platform.claude.com/settings/keys', format: 'anthropic', paid: true },
+    { id: 'claude', name: 'Claude (paid)', base: 'https://api.anthropic.com/v1', model: 'claude-opus-5-5', keyUrl: 'https://platform.claude.com/settings/keys', format: 'anthropic', paid: true, vision: true },
     { id: 'ollama', name: 'Ollama (on this computer, unlimited)', base: 'http://localhost:11434/v1', model: 'llama3.2', keyUrl: 'https://ollama.com/download', noKey: true },
   ];
 
@@ -33,7 +30,7 @@
     const seen = new Set();
     (saved || []).forEach(s => {
       const def = PROVIDERS.find(p => p.id === s.id);
-      if (def) { out.push({ ...def, ...s, keyUrl: def.keyUrl, noKey: def.noKey, format: def.format, paid: def.paid, extra: def.extra }); seen.add(s.id); }
+      if (def) { out.push({ ...def, ...s, keyUrl: def.keyUrl, noKey: def.noKey, format: def.format, paid: def.paid, extra: def.extra, reasoning: def.reasoning, vision: def.vision }); seen.add(s.id); }
       else if (s.custom) { out.push(s); seen.add(s.id); }
     });
     PROVIDERS.forEach(p => { if (!seen.has(p.id)) out.push({ ...p, key: '', enabled: true }); });
@@ -66,6 +63,7 @@
     if (s === 402 || /credit|billing|payment|insufficient/.test(msg)) return 'out of credits';
     if (s === 429) return 'limit reached';
     if (s === 401 || s === 403) return 'key not accepted';
+    if (s === 405 || /<html/i.test(msg)) return 'that address is not an AI service, check the base URL';
     if (s === 404) return 'model name not found';
     if (err && err.name === 'AbortError') return 'took too long';
     if (s >= 500) return 'service is down';
@@ -73,10 +71,19 @@
     return 'could not connect';
   }
 
+  // Pictures arrive in the OpenAI shape (image_url with a data: link); Claude wants base64 blocks.
+  function toAnthropic(content) {
+    if (!Array.isArray(content)) return String(content);
+    return content.map(c => {
+      const m = c.type === 'image_url' && /^data:([^;]+);base64,(.*)$/.exec(c.image_url.url);
+      return m ? { type: 'image', source: { type: 'base64', media_type: m[1], data: m[2] } } : { type: 'text', text: String(c.text || '') };
+    });
+  }
+
   // Claude via the Messages API. The system prompt goes in the top-level "system" field.
   async function callAnthropic(p, messages, opts, signal) {
     const system = messages.filter(m => m.role === 'system').map(m => m.content).join('\n\n');
-    const turns = messages.filter(m => m.role !== 'system').map(m => ({ role: m.role, content: String(m.content) }));
+    const turns = messages.filter(m => m.role !== 'system').map(m => ({ role: m.role, content: toAnthropic(m.content) }));
     while (turns.length && turns[0].role !== 'user') turns.shift(); // must start with the user
     // Server-side fallback exists for these models only (not Haiku); other models just stop on a decline.
     const canFallback = /^claude-(opus-5-5|opus-5|sonnet-5-5|fable-5-1)$/.test(p.model);
@@ -139,6 +146,12 @@
     }
     const request = { model: p.model, messages, temperature: opts.temperature ?? 0.5, max_tokens: local ? 400 : (opts.maxTokens || 2048) };
     if (local) request.keep_alive = '30m';
+    if (p.reasoning) {
+      // Thinking counts toward the limit, so leave room for it on top of the answer.
+      delete request.temperature;
+      request.max_completion_tokens = request.max_tokens + 4000;
+      delete request.max_tokens;
+    }
     if (p.extra) Object.assign(request, p.extra); // provider-specific settings, e.g. GLM's thinking switch
     try {
       const res = await fetch(p.base.replace(/\/$/, '') + '/chat/completions', {
@@ -200,6 +213,7 @@
         .sort((a, b) => ((this.state[a.id] || {}).until || 0) - ((this.state[b.id] || {}).until || 0));
       let list = ready.concat(resting);
       if (opts.skipLocal) list = list.filter(p => !p.noKey); // long jobs are too slow for a laptop's own processor
+      if (opts.visionOnly) list = list.filter(p => p.vision); // only models that can look at pictures
       if (!list.length) throw new Error('No models set up yet. Open Settings and paste at least one free API key, or install Ollama.');
       const errors = [];
       for (let i = 0; i < list.length; i++) {
@@ -223,5 +237,25 @@
     }
   }
 
-  return { PROVIDERS, Router, defaultProviderConfig, mergeProviderConfig, cooldownFor, describeError };
+  // A model he adds himself. Works with any service that offers an "OpenAI-compatible" API,
+  // which most do. People often paste the full address, so the end is trimmed off.
+  function customProvider({ name, base, model, key }) {
+    base = String(base || '').trim().replace(/\/+$/, '').replace(/\/chat\/completions$/, '').replace(/\/+$/, '');
+    if (!/^https?:\/\/[^\s/]+/i.test(base)) throw new Error('The address should start with https://, for example https://api.example.com/v1');
+    if (!String(model || '').trim()) throw new Error('Type the model name the service gives you.');
+    return {
+      id: 'custom-' + Date.now().toString(36), custom: true, enabled: true,
+      name: String(name || '').trim() || new URL(base).hostname.replace(/^api\./, ''),
+      base, model: String(model).trim(), key: String(key || '').trim(), keyUrl: '', noKey: !String(key || '').trim(),
+    };
+  }
+  // One tiny request, so he knows straight away if the details are right.
+  async function testProvider(p) {
+    try {
+      const text = await callProvider(p, [{ role: 'user', content: 'Reply with just the word OK.' }], { maxTokens: 50, timeout: 45000 });
+      return { ok: true, result: 'It works. It replied: ' + text.trim().slice(0, 60) };
+    } catch (e) { return { ok: false, result: describeError(e) + ' (' + String(e.message).slice(0, 160) + ')' }; }
+  }
+
+  return { PROVIDERS, Router, defaultProviderConfig, mergeProviderConfig, cooldownFor, describeError, customProvider, testProvider };
 });

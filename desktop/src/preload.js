@@ -23,6 +23,8 @@ contextBridge.exposeInMainWorld('splash', {
   tts: invoke('tts'),
   pairingInfo: invoke('pairing-info'),
   attachDocument: invoke('attach-document'),
+  testModel: invoke('test-model'),
+  makeCustomModel: invoke('make-custom-model'),
   detachDocument: invoke('detach-document'),
   pathForFile: file => webUtils.getPathForFile(file),
   modelUrl: invoke('model-url'),

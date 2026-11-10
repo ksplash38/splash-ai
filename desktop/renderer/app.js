@@ -156,6 +156,7 @@ function setListening(mode) {
   b.title = off ? 'Start listening again' : 'Stop listening to me';
   b.setAttribute('aria-label', b.title);
   $('#listenBtnText').textContent = off ? 'Not listening' : 'Stop listening';
+  remember('micOff', off ? '1' : ''); // stays muted after a restart too
   if (!voice) return;
   if (mode === 'off') voice.setMicOff(true);
   else { voice.setMicOff(false); voice.setOpenMic(false); voice.mute(false); }
@@ -185,7 +186,9 @@ async function handleCommand(text, heard = 'typed') {
   }
   if (STOP_RE.test(text)) { queue.length = 0; SplashSpeaker.stop(); if (!busy) { voice && voice.mute(false); setState('idle', idleLabel()); } return; }
   if (/^(start a )?new (conversation|chat)\.?$/i.test(text)) { S = await api.newConversation(); renderChat(); setState('idle', 'New conversation started'); voice && voice.mute(false); return; }
-  if (heard !== 'open' && listening !== 'awake') setListening('awake'); // talking to it directly wakes it up
+  // Saying the wake word wakes it from resting. Typing never turns the mic back on:
+  // a muted mic stays muted until he clicks Stop listening again or the mic button.
+  if (heard === 'wake' && listening === 'sleep') setListening('awake');
   if (busy) {
     queue.push({ text, heard });
     pushBubble('user', text);
@@ -353,13 +356,13 @@ function renderProviders(status = []) {
     return `<div class="prov ${resting ? 'resting' : ''}">
       <div class="top"><input type="checkbox" data-en="${i}" ${p.enabled ? 'checked' : ''} aria-label="Use ${esc(p.name)}">
         <strong>${esc(p.name)}</strong>
-        <button class="order" data-up="${i}" aria-label="Move up">↑</button><button class="order" data-down="${i}" aria-label="Move down">↓</button></div>
+        <button class="order" data-up="${i}" aria-label="Move up">↑</button><button class="order" data-down="${i}" aria-label="Move down">↓</button>${p.custom ? `<button class="order" data-remove="${i}" aria-label="Remove ${esc(p.name)}">✕</button>` : ''}</div>
       <div class="row2">
         ${p.noKey ? '<span class="hint">No key needed</span>' : `<input type="password" data-key="${i}" value="${esc(p.key)}" placeholder="Paste API key">`}
         <input data-model="${i}" value="${esc(p.model)}" aria-label="Model name">
       </div>
       <div class="status ${resting || (st.last && st.last !== 'ok') ? 'warn' : ''}">${statusText}
-        ${resting ? ` <a data-wake="${p.id}">Try it now</a>` : ''} <a data-link="${esc(p.keyUrl)}">${p.noKey ? 'Download' : p.paid ? 'Get a key (paid)' : 'Get a free key'}</a></div>
+        ${resting ? ` <a data-wake="${p.id}">Try it now</a>` : ''} ${p.custom ? `<span class="hint">Added by you · ${esc(p.base)}</span>` : `<a data-link="${esc(p.keyUrl)}">${p.noKey ? 'Download' : p.paid ? 'Get a key (paid)' : 'Get a free key'}</a>`}</div>
     </div>`;
   }).join('');
   box.querySelectorAll('[data-en]').forEach(el => el.onchange = () => (draft.providers[+el.dataset.en].enabled = el.checked));
@@ -370,7 +373,26 @@ function renderProviders(status = []) {
   const move = (i, d) => { const j = i + d; if (j < 0 || j >= draft.providers.length) return; const a = draft.providers; [a[i], a[j]] = [a[j], a[i]]; refreshStatus(); };
   box.querySelectorAll('[data-up]').forEach(el => el.onclick = () => move(+el.dataset.up, -1));
   box.querySelectorAll('[data-down]').forEach(el => el.onclick = () => move(+el.dataset.down, 1));
+  box.querySelectorAll('[data-remove]').forEach(el => el.onclick = () => { draft.providers.splice(+el.dataset.remove, 1); refreshStatus(); toast('Removed. Press Save settings to keep this.'); });
 }
+
+// ---------- adding his own AI ----------
+function customFromForm() {
+  return { name: $('#cmName').value, base: $('#cmBase').value, model: $('#cmModel').value, key: $('#cmKey').value };
+}
+$('#cmTest').onclick = async () => {
+  $('#cmResult').textContent = 'Testing…';
+  const r = await api.testModel(customFromForm());
+  $('#cmResult').textContent = r.result;
+};
+$('#cmAdd').onclick = async () => {
+  const r = await api.makeCustomModel(customFromForm());
+  if (!r.ok) { $('#cmResult').textContent = r.result; return; }
+  draft.providers.push(r.provider);
+  ['#cmName', '#cmBase', '#cmModel', '#cmKey'].forEach(s => { $(s).value = ''; });
+  $('#cmResult').textContent = `Added ${r.provider.name} at the bottom of the list. Press Save settings to keep it.`;
+  refreshStatus();
+};
 async function refreshStatus() { renderProviders(await api.routerStatus()); }
 
 $('#wakeForm').onsubmit = e => {
@@ -474,6 +496,7 @@ api.on('model-progress', f => { $('#stateLabel').textContent = `Downloading the 
   });
   try {
     await voice.init();
+    if (recall('micOff') === '1') setListening('off');
     setState('idle', idleLabel());
   } catch (e) {
     voice.mode = 'off';

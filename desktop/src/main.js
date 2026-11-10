@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, Tray, Menu, globalShortcut, shell, session, nativeImage, dialog } = require('electron');
+const { app, BrowserWindow, ipcMain, Tray, Menu, globalShortcut, shell, session, nativeImage, dialog, clipboard, desktopCapturer, screen } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const os = require('os');
@@ -8,8 +8,9 @@ const crypto = require('crypto');
 const { Store } = require('./store');
 const { writePaper } = require('./research');
 const { readDocument, saveExtract, removeExtract, loadExtract, summaryOf, documentContext, TEXT_TYPES } = require('./documents');
-const { ACTIONS_DOC, contextLine, makeExecutor } = require('./tools');
-const { Router } = require('./shared/router.js');
+const { ACTIONS_DOC, contextLine, makeExecutor, powershell } = require('./tools');
+const { makeControl } = require('./control');
+const { Router, customProvider, testProvider } = require('./shared/router.js');
 const { buildSystemPrompt, runTurn } = require('./shared/brain.js');
 
 if (!app.requestSingleInstanceLock()) { app.quit(); process.exit(0); }
@@ -39,6 +40,8 @@ function getRouter() {
 }
 
 const docsDir = () => path.join(store.dataDir, 'attached documents');
+let control;
+const getControl = () => control || (control = makeControl({ powershell, router: getRouter(), clipboard, desktopCapturer, screen }));
 
 async function attachDocument(filePath) {
   const doc = await readDocument(filePath);
@@ -61,7 +64,13 @@ async function ask(text, { c, source, confirm, onStep, heard = 'typed' }) {
   };
   const systemPrompt = buildSystemPrompt(promptInfo);
   const compactPrompt = buildSystemPrompt({ ...promptInfo, compact: true });
-  const history = c.messages.map(m => ({ role: m.role, content: m.content }));
+  // What it did last time travels with its replies, so "open the second one" knows what "one" means.
+  const history = c.messages.map(m => ({ role: m.role, content: m.content + (m.role === 'assistant' && m.steps && m.steps.length
+    ? '\n(Actions you ran: ' + m.steps.map(s => `${s.type} ${s.ok ? 'ok' : 'failed'}: ${String(s.result || '').slice(0, 300)}`).join(' | ') + ')' : '') }));
+  const lastReply = [...c.messages].reverse().find(m => m.role === 'assistant');
+  const situation = lastReply && lastReply.at
+    ? `Your last reply was ${Math.round((Date.now() - Date.parse(lastReply.at)) / 1000)} seconds ago${lastReply.expectReply ? ' and asked him a question' : ''}.`
+    : 'This is the start of the conversation.';
   const hasDocs = !!(c.docs && c.docs.length);
   const lastAsked = [...c.messages].reverse().find(m => m.role === 'user');
   const documents = hasDocs ? await documentContext({
@@ -70,8 +79,8 @@ async function ask(text, { c, source, confirm, onStep, heard = 'typed' }) {
     onProgress: t => send('doc-progress', t),
   }) : '';
   const res = await runTurn({
-    router: getRouter(), history, userText: text, systemPrompt, compactPrompt, documents,
-    execute: makeExecutor({ store, confirm, documentOpen: hasDocs, research: a => writePaper({
+    router: getRouter(), history, userText: text, systemPrompt, compactPrompt, documents, situation,
+    execute: makeExecutor({ store, confirm, documentOpen: hasDocs, control: getControl().newTurn() || getControl(), research: a => writePaper({
       router: getRouter(), topic: a.topic, length: a.length, instructions: a.instructions,
       outDir: path.join(store.dataDir, 'Research'), onProgress: t => send('research-progress', t),
     }) }), onStep, heard,
@@ -80,7 +89,7 @@ async function ask(text, { c, source, confirm, onStep, heard = 'typed' }) {
   const at = new Date().toISOString();
   c.messages.push({ role: 'user', content: text, at, source });
   // content (what the model sees next time) includes the explanation; the visual is kept alongside for the chat
-  c.messages.push({ role: 'assistant', content: res.say + (res.explain ? '\n\n' + res.explain : ''), say: res.say, explain: res.explain, visual: res.visual, at, provider: res.provider, model: res.model,
+  c.messages.push({ role: 'assistant', content: res.say + (res.explain ? '\n\n' + res.explain : ''), say: res.say, explain: res.explain, visual: res.visual, expectReply: res.expectReply, at, provider: res.provider, model: res.model,
     steps: res.steps.map(s => ({ type: s.type, ok: s.ok, result: String(s.result).slice(0, 400) })) });
   store.saveConversation(c);
   res.notes.forEach(n => store.addNote(n, source));
@@ -453,6 +462,8 @@ function registerIpc() {
   ipcMain.handle('router-status', () => getRouter().status());
   ipcMain.handle('transcribe', (_, buf) => transcribe(buf));
   ipcMain.handle('natural-voices', () => NATURAL_VOICES);
+  ipcMain.handle('make-custom-model', (_, form) => { try { return { ok: true, provider: customProvider(form) }; } catch (e) { return { ok: false, result: e.message }; } });
+  ipcMain.handle('test-model', async (_, form) => { try { return await testProvider(customProvider(form)); } catch (e) { return { ok: false, result: e.message }; } });
   ipcMain.handle('pairing-info', (_, fresh) => pairingInfo(!!fresh));
   ipcMain.handle('tts', async (_, { text, voice }) => {
     try { return { ok: true, audio: await synthesize(text, voice) }; }

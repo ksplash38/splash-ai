@@ -62,6 +62,7 @@ Open Splash AI on the laptop, go to **Settings, Models**. Each model has a **Get
 | Mistral | console.mistral.ai/api-keys |
 | GitHub Models (a GitHub token) | github.com/settings/tokens |
 | Hugging Face | huggingface.co/settings/tokens |
+| OpenAI (paid; paste the **secret key** that starts with `sk-`) | platform.openai.com/api-keys |
 | GLM 5.2 by Z.ai (paid) | z.ai/manage-apikey/apikey-list |
 | Claude (paid, pay per use, needs credit on your Anthropic account) | platform.claude.com/settings/keys |
 | Ollama, on your laptop | no key |
@@ -90,6 +91,7 @@ setx OLLAMA_HOST "0.0.0.0"
 - **Talking to someone else:** when it hears you without the wake word (during a follow-up or while it's thinking), it works out whether you were talking to it. If you were talking to someone else or to yourself, it stays quiet and shows your words faded with "not for me".
 - **Research papers:** say "write me a research paper on ..." (add "short" or "long" if you like). It searches real published papers in OpenAlex, Crossref and arXiv, writes section by section, and opens a Word file with APA references saved in `Documents\Splash AI\Research`. It takes a few minutes and needs at least one online model ticked. It reads abstracts, not full papers, so check the key claims before using it.
 - **Documents:** on the laptop, click the paperclip or drag a PDF, Word (.docx) or text file onto the window. On the phone, tap the paperclip. Then ask about it: "explain this to me", "what's on page 3?", "what does it say about payment?". It says which page the answer came from. A long document takes a minute or so the first time you ask for a summary. Parts of the text are sent to whichever online model answers. Scanned PDFs (pictures of pages) can't be read yet. While a document is attached, it asks before doing anything on your computer, because files can contain hidden instructions.
+- **Operating the laptop:** ask it to do things in any app, like "open Calculator and work out 25 times 4" or "in Chrome, search for flights to Abuja". It looks at the window in front, finds the buttons and boxes, then clicks, types and presses keys, checking as it goes. It must look before it touches anything, and stops if the window changes. It asks before sending, paying or deleting. With Gemini, OpenAI or Claude ticked it can also see a picture of the screen (that picture is sent to the model), which helps in apps that don't report their buttons.
 - **Voice:** it speaks as **Abeo**, a natural Nigerian man's voice, by default. Change it in **Settings, Voice** (Ezinne, Ryan, Andrew, or the offline Windows voices). The natural voices need internet and come from Microsoft's free Edge read-aloud service; if that ever fails, it falls back to the Windows voice.
 - **Closing the window** hides it to the tray; it keeps listening. Quit from the tray icon.
 - **Phone:** tap the core to talk, or turn on **Wake** for hands-free while the app is open. After it answers it listens once more for a follow-up. When linked to the laptop it uses the same Abeo voice; otherwise it uses the phone's own Nigerian English voice if installed.

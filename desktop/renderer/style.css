@@ -126,6 +126,10 @@ h2 { font-family: var(--display); font-weight: 400; font-size: 16px; margin: 18p
 .prov .status { font-size: 12px; color: var(--mist); margin-top: 6px; }
 .prov .status.warn { color: var(--ember); }
 .prov a { color: var(--aqua); font-size: 12px; cursor: pointer; }
+.addmodel { border: 1px dashed var(--line); border-radius: 10px; padding: 8px 10px; margin: 4px 0 8px; }
+.addmodel summary { cursor: pointer; color: var(--aqua); }
+.addmodel .wide { margin-top: 6px; }
+.addmodel .row { margin-top: 8px; }
 .order { background: none; border: 1px solid var(--line); border-radius: 6px; cursor: pointer; padding: 0 6px; }
 
 .toggle { display: flex; gap: 10px; align-items: flex-start; margin: 8px 0; }

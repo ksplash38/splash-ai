@@ -20,6 +20,20 @@ const ACTIONS_DOC = `- {"type":"list","path":"C:\\\\Users\\\\..."}  list a folde
 - {"type":"run","command":"..."}  run a PowerShell command and get its output. Use it for launching apps (Start-Process), processes, volume, Wi-Fi, installing software (winget), system settings, typing keys, and anything the other actions don't cover
 - {"type":"clipboard_set","text":"..."} and {"type":"clipboard_get"}
 - {"type":"research_paper","topic":"...","length":"short|medium|long","instructions":"any extra wishes, or empty"}  research real published papers and write a referenced Word document (takes a few minutes). ALWAYS use this when he asks for research or a research paper or essay with references; never write one yourself or invent references. Lengths are about 1500, 3000 or 6000 words; use medium if he doesn't say. If the topic is unclear, ask him first.
+- {"type":"launch","app":"calc"}  start an app by its name, e.g. calc, notepad, chrome, msedge, winword, excel, explorer, spotify
+- {"type":"look","question":"what you are trying to do"}  see the screen: the window in front, a numbered list of its buttons, links and boxes, the open windows, and (when available) a description of a picture of the screen
+- {"type":"click","element":12}  click a numbered item from the last look ("double":true or "right":true for double or right click). Or {"type":"click","x":640,"y":400} for a spot on the screen
+- {"type":"type","text":"...","enter":false}  type into whatever is selected (click the box first); "enter":true presses Enter after
+- {"type":"keys","keys":"ctrl+s"}  press keys, e.g. "enter", "tab", "esc", "ctrl+l", "alt+tab", "win+d", "f5", or several: "ctrl+a, ctrl+c"
+- {"type":"scroll","direction":"down","amount":5}  scroll the window in front up or down
+- {"type":"focus","window":"part of the window title or app name"}  bring an open window to the front
+- {"type":"wait","seconds":2}  wait for something to load
+To operate an app like a person would: launch or focus it, look, then click, type or press keys, then look again to check it worked. You must look before clicking, typing or pressing keys, and look again whenever the window in front may have changed, and keep going step by step until the job is done. Use the quicker direct actions (open, url, run) when they do the job. Before clicking something that sends, posts, pays, buys or deletes, tell him what you are about to do and get his yes first.
+Quick routes for messages (he must already be signed in on this laptop):
+- Gmail: open the url https://mail.google.com/mail/?view=cm&to=ADDRESS&su=SUBJECT&body=BODY (each part URL-encoded), wait 3 seconds, look, check the details, then after his yes press ctrl+enter to send.
+- WhatsApp: if the WhatsApp app is installed, open the url whatsapp://send?phone=NUMBER&text=MESSAGE, otherwise https://web.whatsapp.com/send?phone=NUMBER&text=MESSAGE. NUMBER is in international form with no + or spaces (e.g. 2348012345678). Wait, look, then after his yes press enter. If he gives a name instead of a number, open WhatsApp, look, search for the name, and pick the chat.
+- Facebook: https://www.facebook.com (and https://www.facebook.com/messages for chats). Use look, click and type from there.
+If a page asks him to sign in, stop and tell him; never type passwords.
 - {"type":"screenshot"}  save a screenshot to Pictures\\Splash AI
 - {"type":"notify","title":"...","text":"..."}  show a Windows notification
 - {"type":"sysinfo"}  computer details: user, folders, drives, memory
@@ -96,11 +110,11 @@ function describe(a) {
   }
 }
 
-const LOOK_ONLY = new Set(['list', 'read', 'find', 'sysinfo']);
+const LOOK_ONLY = new Set(['list', 'read', 'find', 'sysinfo', 'look', 'wait']);
 
 // documentOpen: a file he attached is part of this turn, and files can contain hidden
 // instructions, so anything beyond looking needs his OK even if confirmations are off.
-function makeExecutor({ store, confirm, research, documentOpen }) {
+function makeExecutor({ store, confirm, research, documentOpen, control }) {
   return async function execute(a) {
     const type = String(a.type || '').toLowerCase();
     let risky = type === 'delete' || type === 'run';
@@ -187,6 +201,10 @@ function makeExecutor({ store, confirm, research, documentOpen }) {
         shell.openPath(r.file);
         return { ok: true, result: `Saved and opened "${r.title}" at ${r.file}: about ${r.words} words, ${r.cited} real sources cited out of ${r.found} found. It was written from the papers' abstracts, so he should read it and check the key claims.` };
       }
+      case 'look': case 'click': case 'type': case 'keys': case 'scroll': case 'focus': case 'launch':
+        return control[type](a);
+      case 'press': return control.keys(a);
+      case 'wait': await new Promise(r => setTimeout(r, Math.min(15, Math.max(0.2, Number(a.seconds) || 1)) * 1000)); return { ok: true, result: 'Waited.' };
       case 'clipboard_set': clipboard.writeText(String(a.text || '')); return { ok: true, result: 'Copied to clipboard.' };
       case 'clipboard_get': return { ok: true, result: clipboard.readText() || '(clipboard is empty)' };
       case 'screenshot': {

@@ -511,10 +511,10 @@ function renderSettings() {
     const s = st.find(x => x.id === p.id) || {};
     const warn = s.restingFor > 0;
     return `<div class="prov"><div class="top2"><input type="checkbox" data-en="${i}" ${p.enabled ? 'checked' : ''}><strong>${esc(p.name)}</strong>
-      <button class="order" data-up="${i}">↑</button><button class="order" data-down="${i}">↓</button></div>
+      <button class="order" data-up="${i}">↑</button><button class="order" data-down="${i}">↓</button>${p.custom ? `<button class="order" data-remove="${i}" aria-label="Remove">✕</button>` : ''}</div>
       ${p.noKey ? '' : `<input type="password" data-key="${i}" value="${esc(p.key)}" placeholder="Paste API key">`}
       <input data-model="${i}" value="${esc(p.model)}">
-      <div class="status ${warn ? 'warn' : ''}">${warn ? `Resting ${Math.ceil(s.restingFor / 60)} min` : (p.key || p.noKey) ? 'Ready' : 'Off until you add a key'} <a data-link="${esc(p.keyUrl)}">Get a key</a></div></div>`;
+      <div class="status ${warn ? 'warn' : ''}">${warn ? `Resting ${Math.ceil(s.restingFor / 60)} min` : (p.key || p.noKey) ? 'Ready' : 'Off until you add a key'} ${p.custom ? 'Added by you' : `<a data-link="${esc(p.keyUrl)}">Get a key</a>`}</div></div>`;
   }).join('');
   const pl = $('#providerList');
   pl.querySelectorAll('[data-en]').forEach(el => el.onchange = () => (draft.providers[+el.dataset.en].enabled = el.checked));
@@ -524,7 +524,22 @@ function renderSettings() {
   const mv = (i, d) => { const j = i + d, a = draft.providers; if (j < 0 || j >= a.length) return; [a[i], a[j]] = [a[j], a[i]]; renderSettings(); };
   pl.querySelectorAll('[data-up]').forEach(el => el.onclick = () => mv(+el.dataset.up, -1));
   pl.querySelectorAll('[data-down]').forEach(el => el.onclick = () => mv(+el.dataset.down, 1));
+  pl.querySelectorAll('[data-remove]').forEach(el => el.onclick = () => { draft.providers.splice(+el.dataset.remove, 1); renderSettings(); toast('Removed. Tap Save settings to keep this.'); });
 }
+// Adding his own AI (any service with an OpenAI-compatible API)
+const customForm = () => ({ name: $('#cmName').value, base: $('#cmBase').value, model: $('#cmModel').value, key: $('#cmKey').value });
+$('#cmTest').onclick = async () => {
+  $('#cmResult').textContent = 'Testing…';
+  try { $('#cmResult').textContent = (await SplashRouter.testProvider(SplashRouter.customProvider(customForm()))).result; }
+  catch (e) { $('#cmResult').textContent = e.message; }
+};
+$('#cmAdd').onclick = () => {
+  try { draft.providers.push(SplashRouter.customProvider(customForm())); }
+  catch (e) { $('#cmResult').textContent = e.message; return; }
+  ['#cmName', '#cmBase', '#cmModel', '#cmKey'].forEach(s => { $(s).value = ''; });
+  renderSettings();
+  $('#cmResult').textContent = 'Added at the bottom of the list. Tap Save settings to keep it.';
+};
 function readDraft() {
   draft.laptop = { address: $('#lapAddr').value.trim(), token: $('#lapToken').value.trim() };
   draft.names = $('#namesInput').value.split(',').map(s => s.trim()).filter(Boolean);

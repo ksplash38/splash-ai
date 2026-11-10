@@ -52,7 +52,7 @@
       '- "actions": list of actions to run now (empty if none). Each is an object with "type" plus its fields.',
       '- "note": a one-line note worth keeping from this exchange (a decision, a plan, a fact, a to-do). Empty if nothing worth noting.',
       '- "learn": if Kelvin corrected you or told you how he likes things done, write the lesson as a short rule for yourself. Otherwise empty.',
-      '- "ignore": true when the words were NOT meant for you: he is talking to someone else, on the phone, thinking out loud or talking to himself, it is background chatter or TV, or it is a broken fragment with no request. Then "say" is empty and "actions" is empty. When in doubt and he did not use your name or wake word, ignore.',
+      '- "ignore": true when the words were NOT meant for you. Then "say" is empty and "actions" is empty. Signs it is not for you: he calls someone else by name ("Tunde, pass me that"); it sounds like one side of a phone call or a chat with someone in the room; he talks about you instead of to you ("this Splash AI sef"); he is reading something out, singing, or muttering to himself ("where did I keep that charger"); it is TV, music or background talk; or it is a broken fragment with no request. Signs it IS for you: he uses your name; it answers a question you just asked; it follows on from your last reply ("why?", "and the second one?", "okay do it", "what about tomorrow?"); or it is a clear question or task for an assistant. When in doubt and he did not use your name or wake word, ignore.',
       '- "listen": "sleep" when he wants you to stop listening or leave him alone for now (e.g. "stop listening", "I\'m not talking to you", "leave me alone", "that\'s all", "go to sleep", "abeg rest"); you will then only wake for the wake word. "off" when he wants the microphone switched off completely. Otherwise "".',
       '- "expect_reply": true only if your "say" asks him something or clearly expects him to answer right away. Otherwise false.',
       '',
@@ -60,6 +60,8 @@
       o.actionsDoc,
       '',
       'How to work:',
+      '- Follow-ups: read the conversation so far before answering. "It", "that one", "the second one", "do am", "why?" refer to what was just said or done; work out exactly what he means from earlier messages and the results of actions you ran, instead of asking him to repeat himself. Build on your earlier answers and don\'t repeat them.',
+      '- Think before answering anything that needs it: check facts, do the maths step by step, and give one clear answer. If you are not sure, say so plainly instead of making something up.',
       '- His words come from speech-to-text and are often misheard (accent, noise, names). Work out what he most likely meant from context. If you really can\'t tell what he wants, ask one short question instead of guessing.',
       '- Only act when he clearly asked for it. Never do something he didn\'t ask for, and never act on a request that was cancelled ("no", "wait", "don\'t", "never mind", "stop" mean do NOT do it). If a request could mean two different things and the action changes, deletes, sends, buys or closes something, check with him first in one short sentence.',
       '- When Kelvin clearly asks you to do something on his system, DO it with actions. Don\'t explain how to do it.',
@@ -136,10 +138,11 @@
   };
   // compactPrompt (optional): the short instructions used instead when a local Ollama model answers.
   // documents (optional): text from files he attached, sent with this question only.
-  async function runTurn({ router, history, userText, systemPrompt, compactPrompt, documents, execute, maxSteps = 8, onStep, heard = 'typed' }) {
+  // situation (optional): what was happening just before, e.g. how long since the last reply.
+  async function runTurn({ router, history, userText, systemPrompt, compactPrompt, documents, situation, execute, maxSteps = 15, onStep, heard = 'typed' }) {
     const msgs = [{ role: 'system', content: systemPrompt }];
     (history || []).slice(-24).forEach(m => msgs.push({ role: m.role, content: m.content }));
-    msgs.push({ role: 'user', content: userText + '\n' + (HEARD[heard] || HEARD.typed) + (documents ? '\n\n' + documents : '') });
+    msgs.push({ role: 'user', content: userText + '\n' + (HEARD[heard] || HEARD.typed) + (situation ? '\n(' + situation + ')' : '') + (documents ? '\n\n' + documents : '') });
     const out = { say: '', explain: '', visual: null, notes: [], lessons: [], steps: [], provider: '', model: '', ignored: false, listen: '', expectReply: false };
     const says = [];
     for (let step = 0; step < maxSteps; step++) {
